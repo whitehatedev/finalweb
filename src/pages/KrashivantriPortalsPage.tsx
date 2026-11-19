@@ -68,7 +68,7 @@ async function openAuthenticatedFile(
  * FARMER PORTAL (/krashivantri/farmer-portal)
  * ============================================================================ */
 export const FarmerPortalPage: React.FC = () => {
-  const { isSignedIn, openAuthModal, getIdToken, dbUser, apiFetch, notify, navigate } = usePlatform();
+  const { isSignedIn, openAuthModal, getIdToken, dbUser, apiFetch, notify, navigate, supabaseConfigured } = usePlatform();
   const [tab, setTab] = useState<'overview' | 'farms' | 'book' | 'tracking'>('overview');
   const [loading, setLoading] = useState(true);
 
@@ -231,7 +231,7 @@ export const FarmerPortalPage: React.FC = () => {
       if (timer) window.clearInterval(timer);
       if (ch && supabase) supabase.removeChannel(ch);
     };
-  }, [trackBookingId, tab, fetchLiveTracking, apiFetch]);
+  }, [trackBookingId, tab, fetchLiveTracking, apiFetch, supabaseConfigured]);
 
   if (!isSignedIn) {
     return (

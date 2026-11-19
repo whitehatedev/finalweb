@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import {
+  AuthActionError,
   createAdminSession,
   deleteAdminSession,
   ensureInitialAdminUser,
   getAdminSetupStatus,
-  registerUserWithPassword,
+  registerCustomerWithSupabaseAuth,
+  signInCustomerWithSupabaseAuth,
   updateUserPassword,
   verifyAdminCredentials,
-  verifyUserCredentials,
 } from '../../db/users.ts';
 import {
   ADMIN_SESSION_COOKIE,
@@ -109,8 +110,7 @@ authRouter.get('/oauth-status', async (req, res) => {
     recommendedRedirectUrls: Array.from(
       new Set([
         redirectTo,
-        'https://ais-dev-kfl4ewpywpvtna7tqeno5z-802925555269.asia-east1.run.app/auth/callback',
-        'https://ais-pre-kfl4ewpywpvtna7tqeno5z-802925555269.asia-east1.run.app/auth/callback',
+        `${origin}/auth/callback`,
       ])
     ),
   });
@@ -150,6 +150,10 @@ authRouter.post('/register', async (req, res) => {
     const fullName = String(req.body.fullName || '').trim();
     const mobile = String(req.body.mobile || '').trim();
     const companyOrCollege = String(req.body.companyOrCollege || '').trim();
+    const fullAddress = String(req.body.fullAddress || '').trim();
+    const city = String(req.body.city || '').trim();
+    const state = String(req.body.state || '').trim();
+    const pinCode = String(req.body.pinCode || '').trim();
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email address is required.' });
@@ -161,12 +165,16 @@ authRouter.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
     }
 
-    const user = await registerUserWithPassword({
+    const { customer, user } = await registerCustomerWithSupabaseAuth({
       email,
       password,
       fullName,
       mobile,
       companyOrCollege,
+      fullAddress,
+      city,
+      state,
+      pinCode,
     });
 
     const ua = String(req.headers['user-agent'] || '');
@@ -175,29 +183,45 @@ authRouter.post('/register', async (req, res) => {
     res.cookie(USER_SESSION_COOKIE, session.cookieValue, buildCookieOptions(req, session.expiresAt));
 
     await logAudit({
-      actorUid: user.uid,
-      actorEmail: user.email,
+      actorUid: customer.customerId,
+      actorEmail: customer.email,
       action: 'USER_REGISTERED',
-      entityType: 'user',
-      entityId: user.id,
-      details: { role: user.role },
+      entityType: 'customer',
+      entityId: customer.id,
+      details: {
+        customerId: customer.customerId,
+        role: user.role,
+        authProvider: 'supabase_customers_table',
+      },
     });
 
-    res.json({
+    res.status(201).json({
       sessionToken: session.cookieValue,
+      customerId: customer.customerId,
       user: {
         id: user.id,
         uid: user.uid,
+        customerId: customer.customerId,
         email: user.email,
         fullName: user.fullName,
         mobile: user.mobile,
         companyOrCollege: user.companyOrCollege,
+        fullAddress: user.fullAddress,
+        city: user.city,
+        state: user.state,
+        pinCode: user.pinCode,
         role: user.role,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
         isActive: user.isActive,
       },
     });
   } catch (error: any) {
-    res.status(400).json({ error: error?.message || 'Registration failed.' });
+    const status = error instanceof AuthActionError ? error.statusCode : 400;
+    if (status >= 500) {
+      console.error('Customer registration error:', error);
+    }
+    res.status(status).json({ error: error?.message || 'Registration failed.' });
   }
 });
 
@@ -211,10 +235,7 @@ authRouter.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    const user = await verifyUserCredentials(email, password);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
+    const { user, supabaseSession } = await signInCustomerWithSupabaseAuth(email, password);
 
     const ua = String(req.headers['user-agent'] || '');
     const session = await createAdminSession(user.id, ua);
@@ -223,6 +244,7 @@ authRouter.post('/login', async (req, res) => {
 
     res.json({
       sessionToken: session.cookieValue,
+      supabaseSession,
       user: {
         id: user.id,
         uid: user.uid,
@@ -231,10 +253,15 @@ authRouter.post('/login', async (req, res) => {
         mobile: user.mobile,
         companyOrCollege: user.companyOrCollege,
         role: user.role,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
         isActive: user.isActive,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof AuthActionError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Login error:', error);
     res.status(500).json({ error: 'Unable to sign in right now.' });
   }
@@ -357,8 +384,25 @@ authRouter.post('/admin-change-password', requireAuth, requireAdmin(), async (re
     const [userRow] = await db.select().from(users).where(eq(users.id, req.dbUser!.id)).limit(1);
     if (!userRow) return res.status(404).json({ error: 'User not found.' });
 
-    if (userRow.passwordHash && !verifyPassword(currentPassword, userRow.passwordHash)) {
-      return res.status(400).json({ error: 'Current password is incorrect.' });
+    if (userRow.passwordHash) {
+      if (!verifyPassword(currentPassword, userRow.passwordHash)) {
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+    } else {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required.' });
+      }
+      const { createAnonServerSupabaseClient } = await import('../../lib/supabase-admin.ts');
+      const anonClient = createAnonServerSupabaseClient();
+      if (anonClient) {
+        const { error: checkErr } = await anonClient.auth.signInWithPassword({
+          email: userRow.email,
+          password: currentPassword,
+        });
+        if (checkErr) {
+          return res.status(400).json({ error: 'Current password is incorrect.' });
+        }
+      }
     }
 
     await updateUserPassword(userRow.id, newPassword);

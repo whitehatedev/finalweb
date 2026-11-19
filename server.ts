@@ -3,7 +3,7 @@ import express from 'express';
 import fs from 'node:fs/promises';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from './src/db/index.ts';
 import {
   blogs,
@@ -32,6 +32,7 @@ import { dispatchLifecycleEmail } from './src/server/email.ts';
 import { reconcileProjectQuotationPayment } from './src/server/project-lifecycle.ts';
 import { ensureUploadDirs, generateCode, UPLOADS_ROOT } from './src/server/utils.ts';
 import { ensureInitialSeed } from './src/server/seed.ts';
+import { ensureSupabaseStorageBuckets, getSupabasePublicConfig } from './src/lib/supabase-admin.ts';
 import {
   buildArticleSchema,
   buildFaqSchema,
@@ -319,6 +320,9 @@ async function startServer() {
   const port = Number(process.env.PORT || 3000);
 
   ensureUploadDirs();
+  ensureSupabaseStorageBuckets().catch((err) => {
+    console.warn('Supabase storage bucket check warning:', err);
+  });
   ensureInitialSeed().catch((err) => {
     console.error('Startup seed check failed:', err);
   });
@@ -618,8 +622,24 @@ async function startServer() {
   app.use('/uploads/media', express.static(path.join(UPLOADS_ROOT, 'media')));
 
   // Health check
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'nexustekfusion-platform' });
+  app.get('/api/health', async (_req, res) => {
+    let databaseConnected = false;
+    try {
+      await db.execute(sql`SELECT 1`);
+      databaseConnected = true;
+    } catch {
+      databaseConnected = false;
+    }
+    const sbPub = getSupabasePublicConfig();
+    res.json({
+      status: databaseConnected ? 'ok' : 'degraded',
+      service: 'nexustekfusion-platform',
+      database: databaseConnected ? 'connected' : 'disconnected',
+      supabase: {
+        configured: sbPub.configured,
+        urlOrigin: sbPub.url || null,
+      },
+    });
   });
 
   // SEO endpoints
@@ -794,7 +814,12 @@ async function startServer() {
           var authType = hash.get('type') || search.get('type') || '';
 
           if (!accessToken) {
-            return fail('No OAuth access token returned by Supabase. Ensure https://leawuzhjkuzwgzdduwzq.supabase.co/auth/v1/callback and your app /auth/callback URL are configured in Supabase Authentication.');
+            return fail('No OAuth access token returned by Supabase. Ensure ${
+              (() => {
+                const sbUrl = getSupabasePublicConfig().url;
+                return sbUrl ? `${sbUrl}/auth/v1/callback` : 'your Supabase /auth/v1/callback URL';
+              })()
+            } and your app /auth/callback URL are configured in Supabase Authentication.');
           }
 
           var res = await fetch('/api/auth/sync-profile', {

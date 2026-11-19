@@ -293,10 +293,15 @@ export interface CaseStudy {
 export interface DbUser {
   id: number;
   uid: string;
+  customerId?: string;
   email: string;
   fullName: string;
   mobile: string;
   companyOrCollege: string;
+  fullAddress?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
   role: string;
   emailVerified?: boolean;
   phoneVerified?: boolean;

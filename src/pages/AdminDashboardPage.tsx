@@ -52,6 +52,7 @@ import { AboutTeamAdminPanel } from '../components/admin/AboutTeamAdminPanel';
 import { MediaLibraryPanel, MediaPickerModal } from '../components/admin/MediaLibraryPanel';
 import { MasterCmsStudioPanel, CmsStudioSubSection } from '../components/admin/MasterCmsStudioPanel';
 import { PrintingOrdersAdminPanel } from '../components/admin/PrintingOrdersAdminPanel';
+import { CustomerManagementPanel } from '../components/admin/CustomerManagementPanel';
 
 const COMPANY_LOGO = '/assets/aistudio/image_1a5ac752.png';
 
@@ -83,6 +84,7 @@ export type AdminTab =
   | 'blogs'
   | 'payments_invoices'
   | 'support'
+  | 'customers'
   | 'users'
   | 'settings'
   | 'audit'
@@ -1146,6 +1148,7 @@ export const AdminDashboardPage: React.FC<{ initialTab?: AdminTab }> = ({ initia
     {
       group: 'CRM, Content & Finance',
       items: [
+        { id: 'customers', label: 'Customer Management', icon: <Users className="w-4 h-4" /> },
         { id: 'crm', label: 'CRM Leads Pipeline', icon: <Briefcase className="w-4 h-4" /> },
         { id: 'rd_projects', label: 'R&D Case Studies', icon: <FileText className="w-4 h-4" /> },
         { id: 'blogs', label: 'Engineering Blogs', icon: <FileText className="w-4 h-4" /> },
@@ -5449,11 +5452,23 @@ export const AdminDashboardPage: React.FC<{ initialTab?: AdminTab }> = ({ initia
               </div>
             )}
 
+            {/* ==================== EDITABLE CUSTOMER MANAGEMENT TABLE ==================== */}
+            {tab === 'customers' && <CustomerManagementPanel onOverviewRefresh={loadAll} />}
+
             {/* ==================== STAFF ROLES, STATUS & PASSWORD ==================== */}
             {tab === 'users' && (
               <div className="space-y-6 text-xs">
                 <div className="rounded-xl border border-[#DCEAF5] bg-white p-6 space-y-3 shadow-sm">
-                  <h2 className="font-display text-lg font-bold text-[#123B5D]">Staff, Customers &amp; Account History</h2>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-display text-lg font-bold text-[#123B5D]">Staff, Customers &amp; Account History</h2>
+                    <button
+                      type="button"
+                      onClick={() => setTab('customers')}
+                      className="px-3 py-1.5 rounded-lg bg-[#42A5F5] hover:bg-[#1E88E5] text-white font-semibold transition-colors"
+                    >
+                      Open Editable Customer Table
+                    </button>
+                  </div>
                   <div className="divide-y divide-[#DCEAF5]">
                     {overview.users.map((u: any) => (
                       <div key={u.id} className="py-3 flex flex-wrap items-center justify-between gap-2">

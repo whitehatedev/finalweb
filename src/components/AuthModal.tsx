@@ -15,6 +15,10 @@ interface AuthModalProps {
     email: string;
     mobile: string;
     companyOrCollege: string;
+    fullAddress?: string;
+    city?: string;
+    state?: string;
+    pinCode?: string;
     password: string;
   }) => Promise<void>;
   onSupabaseOAuth: () => Promise<any>;
@@ -57,6 +61,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [companyOrCollege, setCompanyOrCollege] = useState('');
+  const [fullAddress, setFullAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [pinCode, setPinCode] = useState('');
   const [password, setPassword] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -93,7 +101,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setInfoMsg('');
 
     if (!fullName.trim() || !email.trim()) {
-      setError('Full name and email address are required.');
+      setError('Full Name and Email Address are required.');
+      return;
+    }
+    if (!mobile.trim()) {
+      setError('Phone Number is required.');
+      return;
+    }
+    if (pinCode.trim() && !/^[0-9]{4,10}$/.test(pinCode.trim())) {
+      setError('PIN Code must be 4 to 10 numeric digits.');
       return;
     }
     if (password.length < 8) {
@@ -108,6 +124,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         email: email.trim(),
         mobile: mobile.trim(),
         companyOrCollege: companyOrCollege.trim(),
+        fullAddress: fullAddress.trim(),
+        city: city.trim(),
+        state: stateName.trim(),
+        pinCode: pinCode.trim(),
         password,
       });
       onClose();
@@ -141,22 +161,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const displayError = error || oauthError;
+  const displayError = error || (mode === 'login' ? oauthError : '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#123B5D]/40 backdrop-blur-[2px] p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white border border-[#DCEAF5] shadow-2xl overflow-hidden">
-        <div className="bg-[#F0F8FF] border-b border-[#DCEAF5] px-6 py-4 flex items-center justify-between">
+      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl bg-white border border-[#DCEAF5] shadow-2xl">
+        <div className="bg-[#F0F8FF] border-b border-[#DCEAF5] px-6 py-4 flex items-center justify-between sticky top-0 z-10">
           <div>
-            <div className="text-[11px] font-mono font-semibold text-[#64B5F6] uppercase tracking-wider">
+            <div className="text-[11px] font-mono font-semibold text-[#1E88E5] uppercase tracking-wider">
               NEXUSTEKFUSION Account
             </div>
             <h3 className="font-display text-lg font-bold text-[#123B5D]">
               {mode === 'login'
                 ? 'Sign In to Your Account'
                 : mode === 'forgot'
-                ? 'Reset Account Password'
-                : 'Create Customer Account'}
+                  ? 'Reset Account Password'
+                  : 'Create Customer Account'}
             </h3>
           </div>
           <button
@@ -180,7 +200,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   setInfoMsg('');
                 }}
                 className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  mode === 'login' ? 'bg-white text-[#123B5D] shadow-sm border border-[#DCEAF5]' : 'text-[#263746] hover:text-[#123B5D]'
+                  mode === 'login'
+                    ? 'bg-white text-[#123B5D] shadow-sm border border-[#DCEAF5]'
+                    : 'text-[#263746] hover:text-[#123B5D]'
                 }`}
               >
                 Sign In
@@ -193,7 +215,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   setInfoMsg('');
                 }}
                 className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  mode === 'register' ? 'bg-white text-[#123B5D] shadow-sm border border-[#DCEAF5]' : 'text-[#263746] hover:text-[#123B5D]'
+                  mode === 'register'
+                    ? 'bg-white text-[#123B5D] shadow-sm border border-[#DCEAF5]'
+                    : 'text-[#263746] hover:text-[#123B5D]'
                 }`}
               >
                 Create Account
@@ -218,7 +242,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-[#123B5D]">Email Address *</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
+                  <Mail className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
                   <input
                     type="email"
                     required
@@ -226,7 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@company.com"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                   />
                 </div>
               </div>
@@ -247,7 +271,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
+                  <Lock className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
                   <input
                     type="password"
                     required
@@ -255,7 +279,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                   />
                 </div>
               </div>
@@ -263,7 +287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full py-2.5 bg-[#64B5F6] hover:bg-[#42A5F5] text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
+                className="w-full py-2.5 bg-[#42A5F5] hover:bg-[#1E88E5] text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
               >
                 {busy ? 'Signing In...' : 'Sign In'}
               </button>
@@ -285,13 +309,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
               />
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={busy}
-                  className="flex-1 py-2.5 bg-[#64B5F6] hover:bg-[#42A5F5] text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
+                  className="flex-1 py-2.5 bg-[#42A5F5] hover:bg-[#1E88E5] text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
                 >
                   {busy ? 'Sending...' : 'Send Reset Link'}
                 </button>
@@ -308,92 +332,139 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-3">
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-[#123B5D]">Full Name *</label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Full Name"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
-                  />
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#123B5D]">Mobile Number *</label>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Full Name *</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
+                    <User className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Full Name"
+                      className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@company.com"
+                      className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Phone Number *</label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
                     <input
                       type="tel"
                       required
                       value={mobile}
                       onChange={(e) => setMobile(e.target.value)}
-                      placeholder="+91 9XXXXXXXXX"
-                      className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                      placeholder="10-digit mobile"
+                      className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#123B5D]">Organization / Farm</label>
+
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Company / College Name</label>
                   <input
                     type="text"
                     value={companyOrCollege}
                     onChange={(e) => setCompanyOrCollege(e.target.value)}
                     placeholder="Optional"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-[#123B5D]">Email Address *</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Full Address</label>
                   <input
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    type="text"
+                    value={fullAddress}
+                    onChange={(e) => setFullAddress(e.target.value)}
+                    placeholder="House / Flat, Street, Locality"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-[#123B5D]">Password (min 8 characters) *</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#64B5F6] absolute left-3 top-2.5" />
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">City</label>
                   <input
-                    type="password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create password"
-                    className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#64B5F6] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">State</label>
+                  <input
+                    type="text"
+                    value={stateName}
+                    onChange={(e) => setStateName(e.target.value)}
+                    placeholder="State"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">PIN Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value)}
+                    placeholder="e.g. 440018"
+                    className="w-full rounded-lg border border-[#DCEAF5] bg-white px-3 py-2 font-mono text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-[#123B5D]">Password (min 8) *</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-[#42A5F5] absolute left-3 top-2.5" />
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Create password"
+                      className="w-full rounded-lg border border-[#DCEAF5] bg-white pl-9 pr-3 py-2 text-sm text-[#263746] focus:border-[#42A5F5] focus:outline-none focus:ring-2 focus:ring-[#64B5F6]/20"
+                    />
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full py-2.5 bg-[#64B5F6] hover:bg-[#42A5F5] text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
+                className="w-full py-2.5 bg-[#42A5F5] hover:bg-[#1E88E5] text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
               >
-                {busy ? 'Creating Account...' : 'Create Account'}
+                {busy ? 'Creating Account...' : 'Create Customer Account'}
               </button>
             </form>
           )}
 
-          {mode !== 'forgot' && (
+          {mode === 'login' && (
             <>
               <div className="relative py-1">
                 <div className="absolute inset-0 flex items-center">
@@ -418,7 +489,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       e.preventDefault();
                     }
                   }}
-                  className="w-full py-2.5 bg-[#64B5F6] hover:bg-[#42A5F5] text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-2 transition-colors"
+                  className="w-full py-2.5 bg-[#42A5F5] hover:bg-[#1E88E5] text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-2 transition-colors"
                 >
                   <ShieldCheck className="w-4 h-4" />
                   Open Google Sign-In Popup
@@ -437,7 +508,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {!supabaseConfigured && (
                 <p className="text-[11px] text-[#263746]/70 text-center">
-                  Requires Supabase Google OAuth configuration. Clicking verifies live configuration status.
+                  Google Sign-In requires Supabase OAuth settings. Email &amp; password sign-in works directly.
                 </p>
               )}
             </>

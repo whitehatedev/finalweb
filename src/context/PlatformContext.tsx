@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getSupabaseClient, initSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { getSupabaseClient, getSupabaseOrigin, initSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 import { AuthModal } from '../components/AuthModal';
 import {
   applySeoToDocument,
@@ -53,6 +53,10 @@ interface RegisterPayload {
   email: string;
   mobile: string;
   companyOrCollege: string;
+  fullAddress?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
   password: string;
 }
 
@@ -626,9 +630,11 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           };
           if (statusJson.googleProviderReady === false) {
             const rawMsg = statusJson.googleProviderError || 'Unsupported provider: missing OAuth secret';
+            const sbOrigin = getSupabaseOrigin();
+            const fallbackCb = sbOrigin ? `${sbOrigin}/auth/v1/callback` : '<YOUR_SUPABASE_URL>/auth/v1/callback';
             const friendly = /missing OAuth secret/i.test(rawMsg)
               ? `Google OAuth secret is not configured in Supabase (${rawMsg}). Open Supabase Dashboard -> Authentication -> Sign In / Providers -> Google, paste your Google OAuth Client ID and Client Secret, and save. Authorized redirect URI for Google Cloud Console: ${
-                  statusJson.supabaseCallbackUrl || 'https://leawuzhjkuzwgzdduwzq.supabase.co/auth/v1/callback'
+                  statusJson.supabaseCallbackUrl || fallbackCb
                 }`
               : `Google Sign-In is not ready in Supabase (${rawMsg}). Verify Google Provider settings in Supabase Authentication -> Providers -> Google.`;
             setOauthError(friendly);
@@ -688,10 +694,18 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       try {
-        const res = await apiFetch<{ user: DbUser; sessionToken?: string }>('/api/auth/login', {
+        const res = await apiFetch<{
+          user: DbUser;
+          sessionToken?: string;
+          supabaseSession?: { access_token: string; refresh_token: string } | null;
+        }>('/api/auth/login', {
           method: 'POST',
           body: JSON.stringify({ email, password }),
         });
+        const supabase = getSupabaseClient();
+        if (supabase && res.supabaseSession?.access_token && res.supabaseSession?.refresh_token) {
+          await supabase.auth.setSession(res.supabaseSession).catch(() => {});
+        }
         if (res.sessionToken) persistSessionToken(res.sessionToken);
         setDbUser(res.user);
         await refreshBootstrap();
@@ -717,10 +731,18 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const registerWithEmail = useCallback(
     async (payload: RegisterPayload) => {
-      const res = await apiFetch<{ user: DbUser; sessionToken?: string }>('/api/auth/register', {
+      const res = await apiFetch<{
+        user: DbUser;
+        sessionToken?: string;
+        supabaseSession?: { access_token: string; refresh_token: string } | null;
+      }>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      const supabase = getSupabaseClient();
+      if (supabase && res.supabaseSession?.access_token && res.supabaseSession?.refresh_token) {
+        await supabase.auth.setSession(res.supabaseSession).catch(() => {});
+      }
       if (res.sessionToken) persistSessionToken(res.sessionToken);
       setDbUser(res.user);
       await refreshBootstrap();

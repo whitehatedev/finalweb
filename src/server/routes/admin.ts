@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { and, asc, desc, eq, lte } from 'drizzle-orm';
-import { db } from '../../db/index.ts';
+import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
+import { createPool, db } from '../../db/index.ts';
 import {
   auditLogs,
   b2bEnquiries,
@@ -101,11 +101,13 @@ import {
   pickNeutralAvatar,
 } from '../cms-defaults.ts';
 import { DEFAULT_PROJECT_EMAIL_TEMPLATES, dispatchLifecycleEmail } from '../email.ts';
+import { adminCustomersRouter } from './admin-customers.ts';
 
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth);
 adminRouter.use(requireAdmin());
+adminRouter.use('/customers', adminCustomersRouter);
 
 const mediaUpload = createUploadMiddleware(
   'media',
@@ -285,7 +287,7 @@ adminRouter.get('/overview', async (_req, res) => {
       allPrintDownloadLogs,
       allProductEnquiries,
     ] = await Promise.all([
-      db.select().from(users).orderBy(desc(users.createdAt)),
+      db.select().from(users).where(isNull(users.deletedAt)).orderBy(desc(users.createdAt)),
       db.select().from(storeOrders).where(eq(storeOrders.isDeleted, false)).orderBy(desc(storeOrders.createdAt)),
       db.select().from(printingOrders).orderBy(desc(printingOrders.createdAt)),
       db.select().from(projectEnquiries).where(eq(projectEnquiries.isDeleted, false)).orderBy(desc(projectEnquiries.createdAt)),
@@ -558,13 +560,30 @@ adminRouter.patch('/users/:id/status', requireAdmin(['super_admin']), async (req
     if (id === req.dbUser!.id && !isActive) {
       return res.status(400).json({ error: 'You cannot deactivate your own active session account.' });
     }
+    const nextStatus = isActive ? 'Active' : 'Suspended';
     const [updated] = await db
       .update(users)
-      .set({ isActive, updatedAt: new Date() })
+      .set({
+        isActive,
+        accountStatus: nextStatus,
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, id))
       .returning();
 
     if (!updated) return res.status(404).json({ error: 'User not found.' });
+
+    const pool = createPool();
+    if (pool && updated.authUserId) {
+      await pool
+        .query(
+          `UPDATE customer_mgmt.customers SET account_status = $1 WHERE auth_user_id = $2 AND deleted_at IS NULL`,
+          [nextStatus, updated.authUserId]
+        )
+        .catch(() => {});
+    }
+
     await logAudit({
       actorUid: req.dbUser!.uid,
       actorEmail: req.dbUser!.email,
@@ -1328,10 +1347,14 @@ adminRouter.get('/export/:type', async (req, res) => {
       rows.map((r) => [r.orderNumber, r.fileName, r.technology, r.materialName, r.quantity, r.totalInr, r.orderStatus, r.paymentStatus, r.createdAt.toISOString()])
     );
   } else if (type === 'customers') {
-    const rows = await db.select().from(users).orderBy(desc(users.createdAt));
+    const rows = await db
+      .select()
+      .from(users)
+      .where(isNull(users.deletedAt))
+      .orderBy(desc(users.createdAt));
     csv = toCsv(
-      ['ID', 'Email', 'Full Name', 'Mobile', 'Company/College', 'Role', 'Active', 'Created At'],
-      rows.map((u) => [u.id, u.email, u.fullName, u.mobile, u.companyOrCollege, u.role, u.isActive, u.createdAt.toISOString()])
+      ['ID', 'Email', 'Full Name', 'Mobile', 'Company/College', 'Full Address', 'City', 'State', 'PIN Code', 'Role', 'Account Status', 'Created At'],
+      rows.map((u) => [u.id, u.email, u.fullName, u.mobile, u.companyOrCollege, u.fullAddress, u.city, u.state, u.pinCode, u.role, u.accountStatus, u.createdAt.toISOString()])
     );
   } else if (type === 'enquiries') {
     const rows = await db.select().from(projectEnquiries).where(eq(projectEnquiries.isDeleted, false)).orderBy(desc(projectEnquiries.createdAt));

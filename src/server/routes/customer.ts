@@ -2,8 +2,9 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { and, desc, eq, gte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
+import { normalizeMobile } from '../../db/users.ts';
 import {
   b2bEnquiries,
   customerAddresses,
@@ -263,18 +264,31 @@ customerRouter.get('/me', requireAuth, async (req: AuthRequest, res) => {
 customerRouter.put('/me', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { fullName, mobile, companyOrCollege } = req.body;
+    const cleanMobile = normalizeMobile(mobile ?? req.dbUser!.mobile);
+    if (cleanMobile) {
+      const conflict = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.mobile, cleanMobile), ne(users.id, req.dbUser!.id), isNull(users.deletedAt)))
+        .limit(1);
+      if (conflict.length > 0) {
+        return res.status(409).json({ error: 'This mobile number is already registered with another account.' });
+      }
+    }
+
     const [updated] = await db
       .update(users)
       .set({
         fullName: String(fullName ?? req.dbUser!.fullName).trim(),
-        mobile: String(mobile ?? req.dbUser!.mobile).trim(),
+        mobile: cleanMobile,
         companyOrCollege: String(companyOrCollege ?? req.dbUser!.companyOrCollege).trim(),
         updatedAt: new Date(),
       })
       .where(eq(users.id, req.dbUser!.id))
       .returning();
 
-    res.json({ user: updated });
+    const { passwordHash: _ph, ...safe } = updated;
+    res.json({ user: safe });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ error: 'Failed to update profile.' });

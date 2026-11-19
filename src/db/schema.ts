@@ -1,34 +1,75 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   doublePrecision,
   integer,
   jsonb,
-  pgTable,
+  pgSchema,
   serial,
   text,
   timestamp,
+  uuid,
 } from 'drizzle-orm/pg-core';
 
+export const webPlatformSchema = pgSchema('web_platform');
+
 // 1. Users & Role-Based Access Control
-export const users = pgTable('users', {
+export const users = webPlatformSchema.table('users', {
   id: serial('id').primaryKey(),
   uid: text('uid').notNull().unique(),
+  authUserId: uuid('auth_user_id'),
   email: text('email').notNull(),
   fullName: text('full_name').default('').notNull(),
   mobile: text('mobile').default('').notNull(),
   companyOrCollege: text('company_or_college').default('').notNull(),
-  role: text('role').default('customer').notNull(), // customer | super_admin | website_manager | product_manager | sales_manager | project_manager | engineer | inventory_manager | accounts_manager | support_manager
-  passwordHash: text('password_hash').default('').notNull(),
+  role: text('role').default('customer').notNull(), // customer | super_admin | admin | farmer | drone_pilot | buyer | website_manager | product_manager | sales_manager | project_manager | engineer | printing_operator | inventory_manager | accounts_manager | support_manager | support_staff
+  passwordHash: text('password_hash'),
   emailVerified: boolean('email_verified').default(false).notNull(),
   phoneVerified: boolean('phone_verified').default(false).notNull(),
   emailConfirmedAt: text('email_confirmed_at').default('').notNull(),
   phoneConfirmedAt: text('phone_confirmed_at').default('').notNull(),
+  accountStatus: text('account_status').default('Active').notNull(),
+  statusReason: text('status_reason').default('').notNull(),
+  fullAddress: text('full_address').default('').notNull(),
+  city: text('city').default('').notNull(),
+  state: text('state').default('').notNull(),
+  pinCode: text('pin_code').default('').notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const adminSessions = pgTable('admin_sessions', {
+// 1b. Dedicated Customer Registration & Editable Directory Table
+export const customers = webPlatformSchema.table('customers', {
+  id: serial('id').primaryKey(),
+  customerId: text('customer_id')
+    .notNull()
+    .unique()
+    .default(sql`('NTF-CUST-' || lpad(nextval('web_platform.customers_code_seq')::text, 4, '0'))`),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'set null' })
+    .unique(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull(),
+  phoneNumber: text('phone_number').default('').notNull(),
+  companyOrCollege: text('company_or_college').default('').notNull(),
+  fullAddress: text('full_address').default('').notNull(),
+  city: text('city').default('').notNull(),
+  state: text('state').default('').notNull(),
+  pinCode: text('pin_code').default('').notNull(),
+  passwordHash: text('password_hash').default('').notNull(),
+  accountStatus: text('account_status').default('Active').notNull(),
+  statusReason: text('status_reason').default('').notNull(),
+  registrationDate: timestamp('registration_date', { withTimezone: true }).defaultNow().notNull(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+export const adminSessions = webPlatformSchema.table('admin_sessions', {
   id: serial('id').primaryKey(),
   tokenHash: text('token_hash').notNull().unique(),
   userId: integer('user_id')
@@ -39,7 +80,7 @@ export const adminSessions = pgTable('admin_sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const customerAddresses = pgTable('customer_addresses', {
+export const customerAddresses = webPlatformSchema.table('customer_addresses', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
@@ -62,7 +103,7 @@ export const customerAddresses = pgTable('customer_addresses', {
 });
 
 // 2. Editable Website CMS & Settings
-export const siteSettings = pgTable('site_settings', {
+export const siteSettings = webPlatformSchema.table('site_settings', {
   id: serial('id').primaryKey(),
   key: text('key').notNull().unique(),
   value: jsonb('value').notNull(),
@@ -70,7 +111,7 @@ export const siteSettings = pgTable('site_settings', {
 });
 
 // 3. E-Commerce Catalogue, Inventory, Cart & Orders
-export const productCategories = pgTable('product_categories', {
+export const productCategories = webPlatformSchema.table('product_categories', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -80,7 +121,7 @@ export const productCategories = pgTable('product_categories', {
   sortOrder: integer('sort_order').default(0).notNull(),
 });
 
-export const brands = pgTable('brands', {
+export const brands = webPlatformSchema.table('brands', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(),
   slug: text('slug').notNull().unique(),
@@ -90,7 +131,7 @@ export const brands = pgTable('brands', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const mediaAssets = pgTable('media_assets', {
+export const mediaAssets = webPlatformSchema.table('media_assets', {
   id: serial('id').primaryKey(),
   fileName: text('file_name').notNull(),
   title: text('title').default('').notNull(),
@@ -107,7 +148,7 @@ export const mediaAssets = pgTable('media_assets', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const products = pgTable('products', {
+export const products = webPlatformSchema.table('products', {
   id: serial('id').primaryKey(),
   categoryId: integer('category_id').references(() => productCategories.id, {
     onDelete: 'set null',
@@ -166,7 +207,7 @@ export const products = pgTable('products', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const wishlists = pgTable('wishlists', {
+export const wishlists = webPlatformSchema.table('wishlists', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
@@ -177,7 +218,7 @@ export const wishlists = pgTable('wishlists', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const productReviews = pgTable('product_reviews', {
+export const productReviews = webPlatformSchema.table('product_reviews', {
   id: serial('id').primaryKey(),
   productId: integer('product_id')
     .references(() => products.id, { onDelete: 'cascade' })
@@ -192,7 +233,7 @@ export const productReviews = pgTable('product_reviews', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const coupons = pgTable('coupons', {
+export const coupons = webPlatformSchema.table('coupons', {
   id: serial('id').primaryKey(),
   code: text('code').notNull().unique(),
   discountType: text('discount_type').default('percent').notNull(), // percent | flat
@@ -203,7 +244,7 @@ export const coupons = pgTable('coupons', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const storeOrders = pgTable('store_orders', {
+export const storeOrders = webPlatformSchema.table('store_orders', {
   id: serial('id').primaryKey(),
   orderNumber: text('order_number').notNull().unique(),
   userId: integer('user_id')
@@ -281,7 +322,7 @@ export const storeOrders = pgTable('store_orders', {
 });
 
 // 4. Custom 3D Printing Engine & Orders
-export const printingMaterials = pgTable('printing_materials', {
+export const printingMaterials = webPlatformSchema.table('printing_materials', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   technology: text('technology').default('FDM').notNull(), // FDM | SLA
@@ -296,7 +337,7 @@ export const printingMaterials = pgTable('printing_materials', {
   isActive: boolean('is_active').default(true).notNull(),
 });
 
-export const printingMachines = pgTable('printing_machines', {
+export const printingMachines = webPlatformSchema.table('printing_machines', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   technology: text('technology').default('FDM').notNull(),
@@ -311,7 +352,7 @@ export const printingMachines = pgTable('printing_machines', {
   isActive: boolean('is_active').default(true).notNull(),
 });
 
-export const printingOrders = pgTable('printing_orders', {
+export const printingOrders = webPlatformSchema.table('printing_orders', {
   id: serial('id').primaryKey(),
   orderNumber: text('order_number').notNull().unique(),
   userId: integer('user_id')
@@ -381,7 +422,7 @@ export const printingOrders = pgTable('printing_orders', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const printingProductionFiles = pgTable('3d_printing_production_files', {
+export const printingProductionFiles = webPlatformSchema.table('3d_printing_production_files', {
   id: serial('id').primaryKey(),
   printingOrderId: integer('printing_order_id')
     .references(() => printingOrders.id, { onDelete: 'cascade' })
@@ -397,7 +438,7 @@ export const printingProductionFiles = pgTable('3d_printing_production_files', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const printingFileDownloadLogs = pgTable('printing_file_download_logs', {
+export const printingFileDownloadLogs = webPlatformSchema.table('printing_file_download_logs', {
   id: serial('id').primaryKey(),
   printingOrderId: integer('printing_order_id')
     .references(() => printingOrders.id, { onDelete: 'cascade' })
@@ -415,7 +456,7 @@ export const printingFileDownloadLogs = pgTable('printing_file_download_logs', {
 });
 
 // 5. Engineering Project Enquiries, Quotations & Active Projects
-export const projectEnquiries = pgTable('project_enquiries', {
+export const projectEnquiries = webPlatformSchema.table('project_enquiries', {
   id: serial('id').primaryKey(),
   enquiryNumber: text('enquiry_number').notNull().unique(),
   userId: integer('user_id')
@@ -484,7 +525,7 @@ export const projectEnquiries = pgTable('project_enquiries', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const projectQuotations = pgTable('project_quotations', {
+export const projectQuotations = webPlatformSchema.table('project_quotations', {
   id: serial('id').primaryKey(),
   enquiryId: integer('enquiry_id')
     .references(() => projectEnquiries.id, { onDelete: 'cascade' })
@@ -566,7 +607,7 @@ export const projectQuotations = pgTable('project_quotations', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projects = pgTable('projects', {
+export const projects = webPlatformSchema.table('projects', {
   id: serial('id').primaryKey(),
   projectCode: text('project_code').notNull().unique(),
   enquiryId: integer('enquiry_id')
@@ -634,7 +675,7 @@ export const projects = pgTable('projects', {
 });
 
 // 6. PCB Design & Fabrication (Single & Double Layer), Drone Repairs & B2B Bulk Enquiries
-export const pcbEnquiries = pgTable('pcb_enquiries', {
+export const pcbEnquiries = webPlatformSchema.table('pcb_enquiries', {
   id: serial('id').primaryKey(),
   enquiryNumber: text('enquiry_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -688,7 +729,7 @@ export const pcbEnquiries = pgTable('pcb_enquiries', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const droneRepairBookings = pgTable('drone_repair_bookings', {
+export const droneRepairBookings = webPlatformSchema.table('drone_repair_bookings', {
   id: serial('id').primaryKey(),
   referenceNumber: text('reference_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -733,7 +774,7 @@ export const droneRepairBookings = pgTable('drone_repair_bookings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const b2bEnquiries = pgTable('b2b_enquiries', {
+export const b2bEnquiries = webPlatformSchema.table('b2b_enquiries', {
   id: serial('id').primaryKey(),
   enquiryNumber: text('enquiry_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -762,7 +803,7 @@ export const b2bEnquiries = pgTable('b2b_enquiries', {
 });
 
 // 7. Payments & Invoices
-export const payments = pgTable('payments', {
+export const payments = webPlatformSchema.table('payments', {
   id: serial('id').primaryKey(),
   paymentRef: text('payment_ref').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -785,7 +826,7 @@ export const payments = pgTable('payments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const invoices = pgTable('invoices', {
+export const invoices = webPlatformSchema.table('invoices', {
   id: serial('id').primaryKey(),
   invoiceNumber: text('invoice_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -800,7 +841,7 @@ export const invoices = pgTable('invoices', {
 });
 
 // 8. Blogs, Case Studies, Support Tickets, Notifications & Audit Logs
-export const blogs = pgTable('blogs', {
+export const blogs = webPlatformSchema.table('blogs', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   slug: text('slug').notNull().unique(),
@@ -817,7 +858,7 @@ export const blogs = pgTable('blogs', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const caseStudies = pgTable('case_studies', {
+export const caseStudies = webPlatformSchema.table('case_studies', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   slug: text('slug').notNull().unique(),
@@ -832,7 +873,7 @@ export const caseStudies = pgTable('case_studies', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const supportTickets = pgTable('support_tickets', {
+export const supportTickets = webPlatformSchema.table('support_tickets', {
   id: serial('id').primaryKey(),
   ticketNumber: text('ticket_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -853,7 +894,7 @@ export const supportTickets = pgTable('support_tickets', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const notifications = pgTable('notifications', {
+export const notifications = webPlatformSchema.table('notifications', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
@@ -865,7 +906,7 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const auditLogs = pgTable('audit_logs', {
+export const auditLogs = webPlatformSchema.table('audit_logs', {
   id: serial('id').primaryKey(),
   actorUid: text('actor_uid').notNull(),
   actorEmail: text('actor_email').notNull(),
@@ -877,7 +918,7 @@ export const auditLogs = pgTable('audit_logs', {
 });
 
 // 9. Inventory Movements, Newsletter & Visual Website Editor (CMS Pages & Revisions)
-export const inventoryMovements = pgTable('inventory_movements', {
+export const inventoryMovements = webPlatformSchema.table('inventory_movements', {
   id: serial('id').primaryKey(),
   productId: integer('product_id')
     .references(() => products.id, { onDelete: 'cascade' })
@@ -890,14 +931,14 @@ export const inventoryMovements = pgTable('inventory_movements', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const newsletterSubscribers = pgTable('newsletter_subscribers', {
+export const newsletterSubscribers = webPlatformSchema.table('newsletter_subscribers', {
   id: serial('id').primaryKey(),
   email: text('email').notNull().unique(),
   source: text('source').default('footer').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const cmsPages = pgTable('cms_pages', {
+export const cmsPages = webPlatformSchema.table('cms_pages', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   slug: text('slug').notNull().unique(),
@@ -926,7 +967,7 @@ export const cmsPages = pgTable('cms_pages', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const cmsRevisions = pgTable('cms_revisions', {
+export const cmsRevisions = webPlatformSchema.table('cms_revisions', {
   id: serial('id').primaryKey(),
   targetKey: text('target_key').notNull(),
   label: text('label').default('Snapshot').notNull(),
@@ -936,7 +977,7 @@ export const cmsRevisions = pgTable('cms_revisions', {
 });
 
 // 10. CRM Leads & Customer Follow-up Notes
-export const crmLeads = pgTable('crm_leads', {
+export const crmLeads = webPlatformSchema.table('crm_leads', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').default('').notNull(),
@@ -953,7 +994,7 @@ export const crmLeads = pgTable('crm_leads', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const crmNotes = pgTable('crm_notes', {
+export const crmNotes = webPlatformSchema.table('crm_notes', {
   id: serial('id').primaryKey(),
   entityType: text('entity_type').notNull(), // lead | customer | project_enquiry | order
   entityId: integer('entity_id').notNull(),
@@ -963,7 +1004,7 @@ export const crmNotes = pgTable('crm_notes', {
 });
 
 // 11. Project Payment Plans, Milestones, Receipts, Clearance Certificates, Handover & Email Automation (Module 1)
-export const projectPaymentPlans = pgTable('project_payment_plans', {
+export const projectPaymentPlans = webPlatformSchema.table('project_payment_plans', {
   id: serial('id').primaryKey(),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   enquiryId: integer('enquiry_id').references(() => projectEnquiries.id, { onDelete: 'cascade' }).notNull(),
@@ -978,7 +1019,7 @@ export const projectPaymentPlans = pgTable('project_payment_plans', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projectPaymentMilestones = pgTable('project_payment_milestones', {
+export const projectPaymentMilestones = webPlatformSchema.table('project_payment_milestones', {
   id: serial('id').primaryKey(),
   planId: integer('plan_id').references(() => projectPaymentPlans.id, { onDelete: 'cascade' }),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }),
@@ -995,7 +1036,7 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projectAcceptances = pgTable('project_acceptances', {
+export const projectAcceptances = webPlatformSchema.table('project_acceptances', {
   id: serial('id').primaryKey(),
   enquiryId: integer('enquiry_id').references(() => projectEnquiries.id, { onDelete: 'cascade' }).notNull(),
   quotationId: integer('quotation_id').references(() => projectQuotations.id, { onDelete: 'cascade' }).notNull(),
@@ -1005,7 +1046,7 @@ export const projectAcceptances = pgTable('project_acceptances', {
   acceptedAt: timestamp('accepted_at').defaultNow().notNull(),
 });
 
-export const paymentReceipts = pgTable('payment_receipts', {
+export const paymentReceipts = webPlatformSchema.table('payment_receipts', {
   id: serial('id').primaryKey(),
   receiptNumber: text('receipt_number').notNull().unique(),
   paymentRef: text('payment_ref').notNull(),
@@ -1020,7 +1061,7 @@ export const paymentReceipts = pgTable('payment_receipts', {
   issuedAt: timestamp('issued_at').defaultNow().notNull(),
 });
 
-export const paymentClearanceCertificates = pgTable('payment_clearance_certificates', {
+export const paymentClearanceCertificates = webPlatformSchema.table('payment_clearance_certificates', {
   id: serial('id').primaryKey(),
   certificateNumber: text('certificate_number').notNull().unique(),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
@@ -1036,7 +1077,7 @@ export const paymentClearanceCertificates = pgTable('payment_clearance_certifica
   issuedAt: timestamp('issued_at').defaultNow().notNull(),
 });
 
-export const projectWorkOrders = pgTable('project_work_orders', {
+export const projectWorkOrders = webPlatformSchema.table('project_work_orders', {
   id: serial('id').primaryKey(),
   workOrderNumber: text('work_order_number').notNull().unique(),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
@@ -1049,7 +1090,7 @@ export const projectWorkOrders = pgTable('project_work_orders', {
   issuedAt: timestamp('issued_at').defaultNow().notNull(),
 });
 
-export const projectHandoverDocuments = pgTable('project_handover_documents', {
+export const projectHandoverDocuments = webPlatformSchema.table('project_handover_documents', {
   id: serial('id').primaryKey(),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
@@ -1069,7 +1110,7 @@ export const projectHandoverDocuments = pgTable('project_handover_documents', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projectDeliveryRecords = pgTable('project_delivery_records', {
+export const projectDeliveryRecords = webPlatformSchema.table('project_delivery_records', {
   id: serial('id').primaryKey(),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
   courierName: text('courier_name').default('').notNull(),
@@ -1083,7 +1124,7 @@ export const projectDeliveryRecords = pgTable('project_delivery_records', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projectMessages = pgTable('project_messages', {
+export const projectMessages = webPlatformSchema.table('project_messages', {
   id: serial('id').primaryKey(),
   enquiryId: integer('enquiry_id')
     .references(() => projectEnquiries.id, { onDelete: 'cascade' })
@@ -1103,7 +1144,7 @@ export const projectMessages = pgTable('project_messages', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const projectEmailNotifications = pgTable('project_email_notifications', {
+export const projectEmailNotifications = webPlatformSchema.table('project_email_notifications', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   projectId: integer('project_id').references(() => projects.id, { onDelete: 'set null' }),
@@ -1119,7 +1160,7 @@ export const projectEmailNotifications = pgTable('project_email_notifications', 
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const paymentWebhookEvents = pgTable('payment_webhook_events', {
+export const paymentWebhookEvents = webPlatformSchema.table('payment_webhook_events', {
   id: serial('id').primaryKey(),
   eventId: text('event_id').notNull().unique(),
   provider: text('provider').default('razorpay').notNull(),
@@ -1132,7 +1173,7 @@ export const paymentWebhookEvents = pgTable('payment_webhook_events', {
 });
 
 // 12. KRASHIVANTRI Farmer & Drone Pilot Approval, Live GPS Tracking, Spraying Ops, Payouts & Penalties (Module 2)
-export const farmers = pgTable('farmers', {
+export const farmers = webPlatformSchema.table('farmers', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   farmerCode: text('farmer_code').notNull().unique(),
@@ -1157,7 +1198,7 @@ export const farmers = pgTable('farmers', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const farmerVerifications = pgTable('farmer_verifications', {
+export const farmerVerifications = webPlatformSchema.table('farmer_verifications', {
   id: serial('id').primaryKey(),
   farmerId: integer('farmer_id').references(() => farmers.id, { onDelete: 'cascade' }).notNull(),
   action: text('action').notNull(), // Approved | Rejected | Suspended | Clarification Requested
@@ -1168,7 +1209,7 @@ export const farmerVerifications = pgTable('farmer_verifications', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const farmerDocuments = pgTable('farmer_documents', {
+export const farmerDocuments = webPlatformSchema.table('farmer_documents', {
   id: serial('id').primaryKey(),
   farmerId: integer('farmer_id').references(() => farmers.id, { onDelete: 'cascade' }).notNull(),
   docType: text('doc_type').notNull(), // Aadhaar | Land Record 7/12 | Kisan Card | Bank Passbook
@@ -1180,7 +1221,7 @@ export const farmerDocuments = pgTable('farmer_documents', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const farmerFarms = pgTable('farmer_farms', {
+export const farmerFarms = webPlatformSchema.table('farmer_farms', {
   id: serial('id').primaryKey(),
   farmerId: integer('farmer_id').references(() => farmers.id, { onDelete: 'cascade' }).notNull(),
   farmName: text('farm_name').notNull(),
@@ -1200,7 +1241,7 @@ export const farmerFarms = pgTable('farmer_farms', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const dronePilots = pgTable('drone_pilots', {
+export const dronePilots = webPlatformSchema.table('drone_pilots', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   pilotCode: text('pilot_code').notNull().unique(),
@@ -1226,7 +1267,7 @@ export const dronePilots = pgTable('drone_pilots', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const pilotVerifications = pgTable('pilot_verifications', {
+export const pilotVerifications = webPlatformSchema.table('pilot_verifications', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
   action: text('action').notNull(),
@@ -1237,7 +1278,7 @@ export const pilotVerifications = pgTable('pilot_verifications', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotDocuments = pgTable('pilot_documents', {
+export const pilotDocuments = webPlatformSchema.table('pilot_documents', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
   docType: text('doc_type').notNull(), // DGCA RPC | Drone UIN | Aadhaar | PAN | Insurance
@@ -1249,7 +1290,7 @@ export const pilotDocuments = pgTable('pilot_documents', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotBankAccounts = pgTable('pilot_bank_accounts', {
+export const pilotBankAccounts = webPlatformSchema.table('pilot_bank_accounts', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
   accountHolderName: text('account_holder_name').notNull(),
@@ -1263,7 +1304,7 @@ export const pilotBankAccounts = pgTable('pilot_bank_accounts', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotDrones = pgTable('pilot_drones', {
+export const pilotDrones = webPlatformSchema.table('pilot_drones', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
   droneModel: text('drone_model').notNull(), // e.g. KRASHIVANTRI X, KRASHIVANTRI X PRO
@@ -1275,7 +1316,7 @@ export const pilotDrones = pgTable('pilot_drones', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotAvailability = pgTable('pilot_availability', {
+export const pilotAvailability = webPlatformSchema.table('pilot_availability', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull().unique(),
   isOnline: boolean('is_online').default(false).notNull(),
@@ -1291,7 +1332,7 @@ export const pilotAvailability = pgTable('pilot_availability', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const pilotLocationUpdates = pgTable('pilot_location_updates', {
+export const pilotLocationUpdates = webPlatformSchema.table('pilot_location_updates', {
   id: serial('id').primaryKey(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
   bookingId: integer('booking_id'),
@@ -1305,7 +1346,7 @@ export const pilotLocationUpdates = pgTable('pilot_location_updates', {
   recordedAt: timestamp('recorded_at').defaultNow().notNull(),
 });
 
-export const serviceBookings = pgTable('service_bookings', {
+export const serviceBookings = webPlatformSchema.table('service_bookings', {
   id: serial('id').primaryKey(),
   bookingNumber: text('booking_number').notNull().unique(),
   farmerId: integer('farmer_id').references(() => farmers.id, { onDelete: 'cascade' }).notNull(),
@@ -1334,7 +1375,7 @@ export const serviceBookings = pgTable('service_bookings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const bookingAssignments = pgTable('booking_assignments', {
+export const bookingAssignments = webPlatformSchema.table('booking_assignments', {
   id: serial('id').primaryKey(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
@@ -1345,7 +1386,7 @@ export const bookingAssignments = pgTable('booking_assignments', {
   respondedAt: timestamp('responded_at'),
 });
 
-export const bookingStatusHistory = pgTable('booking_status_history', {
+export const bookingStatusHistory = webPlatformSchema.table('booking_status_history', {
   id: serial('id').primaryKey(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
   status: text('status').notNull(),
@@ -1354,7 +1395,7 @@ export const bookingStatusHistory = pgTable('booking_status_history', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const operationSessions = pgTable('operation_sessions', {
+export const operationSessions = webPlatformSchema.table('operation_sessions', {
   id: serial('id').primaryKey(),
   sessionCode: text('session_code').notNull().unique(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
@@ -1377,7 +1418,7 @@ export const operationSessions = pgTable('operation_sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const operationEvidence = pgTable('operation_evidence', {
+export const operationEvidence = webPlatformSchema.table('operation_evidence', {
   id: serial('id').primaryKey(),
   sessionId: integer('session_id').references(() => operationSessions.id, { onDelete: 'cascade' }).notNull(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
@@ -1392,7 +1433,7 @@ export const operationEvidence = pgTable('operation_evidence', {
   capturedAt: timestamp('captured_at').defaultNow().notNull(),
 });
 
-export const operationVerifications = pgTable('operation_verifications', {
+export const operationVerifications = webPlatformSchema.table('operation_verifications', {
   id: serial('id').primaryKey(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
   sessionId: integer('session_id').references(() => operationSessions.id, { onDelete: 'cascade' }).notNull(),
@@ -1403,7 +1444,7 @@ export const operationVerifications = pgTable('operation_verifications', {
   verifiedAt: timestamp('verified_at'),
 });
 
-export const farmerPayments = pgTable('farmer_payments', {
+export const farmerPayments = webPlatformSchema.table('farmer_payments', {
   id: serial('id').primaryKey(),
   paymentRef: text('payment_ref').notNull().unique(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
@@ -1419,7 +1460,7 @@ export const farmerPayments = pgTable('farmer_payments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const farmerRefunds = pgTable('farmer_refunds', {
+export const farmerRefunds = webPlatformSchema.table('farmer_refunds', {
   id: serial('id').primaryKey(),
   refundRef: text('refund_ref').notNull().unique(),
   bookingId: integer('booking_id').references(() => serviceBookings.id, { onDelete: 'cascade' }).notNull(),
@@ -1432,7 +1473,7 @@ export const farmerRefunds = pgTable('farmer_refunds', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotEarningLedger = pgTable('pilot_earning_ledger', {
+export const pilotEarningLedger = webPlatformSchema.table('pilot_earning_ledger', {
   id: serial('id').primaryKey(),
   ledgerRef: text('ledger_ref').notNull().unique(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
@@ -1447,7 +1488,7 @@ export const pilotEarningLedger = pgTable('pilot_earning_ledger', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const pilotPayouts = pgTable('pilot_payouts', {
+export const pilotPayouts = webPlatformSchema.table('pilot_payouts', {
   id: serial('id').primaryKey(),
   payoutRef: text('payout_ref').notNull().unique(),
   pilotId: integer('pilot_id').references(() => dronePilots.id, { onDelete: 'cascade' }).notNull(),
@@ -1463,7 +1504,7 @@ export const pilotPayouts = pgTable('pilot_payouts', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const penalties = pgTable('penalties', {
+export const penalties = webPlatformSchema.table('penalties', {
   id: serial('id').primaryKey(),
   penaltyNumber: text('penalty_number').notNull().unique(),
   targetType: text('target_type').default('pilot').notNull(), // pilot | farmer
@@ -1479,7 +1520,7 @@ export const penalties = pgTable('penalties', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const penaltyAppeals = pgTable('penalty_appeals', {
+export const penaltyAppeals = webPlatformSchema.table('penalty_appeals', {
   id: serial('id').primaryKey(),
   penaltyId: integer('penalty_id').references(() => penalties.id, { onDelete: 'cascade' }).notNull(),
   appellantUserId: integer('appellant_user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -1493,7 +1534,7 @@ export const penaltyAppeals = pgTable('penalty_appeals', {
 });
 
 // 13. Logged-in Customer Persistent Cart & Razorpay Refund Ledger
-export const customerCarts = pgTable('customer_carts', {
+export const customerCarts = webPlatformSchema.table('customer_carts', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
@@ -1520,7 +1561,7 @@ export const customerCarts = pgTable('customer_carts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const paymentRefunds = pgTable('payment_refunds', {
+export const paymentRefunds = webPlatformSchema.table('payment_refunds', {
   id: serial('id').primaryKey(),
   refundRef: text('refund_ref').notNull().unique(),
   paymentId: integer('payment_id').references(() => payments.id, { onDelete: 'set null' }),
@@ -1539,7 +1580,7 @@ export const paymentRefunds = pgTable('payment_refunds', {
 });
 
 // 14. Structured Team Profiles & Website Promotional Banners
-export const teamMembers = pgTable('team_members', {
+export const teamMembers = webPlatformSchema.table('team_members', {
   id: serial('id').primaryKey(),
   slugKey: text('slug_key').notNull().unique(),
   fullName: text('full_name').notNull(),
@@ -1564,7 +1605,7 @@ export const teamMembers = pgTable('team_members', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const websiteBanners = pgTable('website_banners', {
+export const websiteBanners = webPlatformSchema.table('website_banners', {
   id: serial('id').primaryKey(),
   bannerKey: text('banner_key').notNull().unique(),
   title: text('title').notNull(),
@@ -1583,7 +1624,7 @@ export const websiteBanners = pgTable('website_banners', {
 });
 
 // 15. Agricultural Drone & Hardware Product Enquiries (KRASHIVANTRI & Flagship Storefront)
-export const productEnquiries = pgTable('product_enquiries', {
+export const productEnquiries = webPlatformSchema.table('product_enquiries', {
   id: serial('id').primaryKey(),
   enquiryNumber: text('enquiry_number').notNull().unique(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),

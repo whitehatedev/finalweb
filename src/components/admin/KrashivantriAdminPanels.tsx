@@ -53,7 +53,7 @@ export const KrashivantriAdminWorkspace: React.FC<{
   section: KrashivantriAdminSection;
   isSuperAdmin: boolean;
 }> = ({ section, isSuperAdmin }) => {
-  const { apiFetch, getIdToken, notify } = usePlatform();
+  const { apiFetch, getIdToken, notify, supabaseConfigured } = usePlatform();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -181,7 +181,7 @@ export const KrashivantriAdminWorkspace: React.FC<{
       window.clearInterval(id);
       if (channel && supabase) supabase.removeChannel(channel);
     };
-  }, [section]);
+  }, [section, supabaseConfigured]);
 
   const verifyFarmer = async (id: number, action: 'Approved' | 'Rejected' | 'Suspended' | 'Clarification Requested') => {
     const note = (farmerNotes[id] || '').trim();

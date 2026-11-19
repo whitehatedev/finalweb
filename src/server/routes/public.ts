@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import {
   blogs,
@@ -915,21 +915,46 @@ publicRouter.post('/express-checkout', optionalAuth, async (req: AuthRequest, re
     let sessionToken: string | undefined;
 
     if (!checkoutUser) {
-      const guestUid = `guest_${crypto.randomBytes(8).toString('hex')}`;
-      const [createdGuest] = await db
-        .insert(users)
-        .values({
-          uid: guestUid,
-          email,
-          fullName,
-          mobile,
-          companyOrCollege: '',
-          role: 'customer',
-          passwordHash: '',
-          isActive: true,
-        })
-        .returning();
-      checkoutUser = createdGuest;
+      const cleanMobile = mobile.replace(/[\s()-]+/g, '').replace(/^(?:\+?91)(?=[6-9]\d{9}$)/, '');
+      const existingMatch = await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            isNull(users.deletedAt),
+            or(
+              sql`lower(${users.email}) = ${email}`,
+              cleanMobile ? eq(users.mobile, cleanMobile) : sql`false`
+            )
+          )
+        )
+        .limit(1);
+
+      if (existingMatch.length > 0) {
+        const matched = existingMatch[0];
+        if (!matched.uid.startsWith('guest_')) {
+          return res.status(409).json({
+            error: 'An account with this email or mobile number already exists. Please sign in to complete your order.',
+          });
+        }
+        checkoutUser = matched;
+      } else {
+        const guestUid = `guest_${crypto.randomBytes(8).toString('hex')}`;
+        const [createdGuest] = await db
+          .insert(users)
+          .values({
+            uid: guestUid,
+            email,
+            fullName,
+            mobile: cleanMobile,
+            companyOrCollege: '',
+            role: 'customer',
+            accountStatus: 'Active',
+            isActive: true,
+          })
+          .returning();
+        checkoutUser = createdGuest;
+      }
 
       await db.insert(customerAddresses).values({
         userId: checkoutUser.id,

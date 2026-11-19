@@ -15,15 +15,16 @@ export function normalizeSupabaseUrl(rawUrl?: string): string {
   }
 }
 
-const DEFAULT_SUPABASE_URL = 'https://leawuzhjkuzwgzdduwzq.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_JCsq4SAwU3Lw9265lJ8maw_t9pRSS4I';
-
 configuredUrl = normalizeSupabaseUrl(
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) || DEFAULT_SUPABASE_URL
+  import.meta.env.VITE_SUPABASE_URL as string | undefined
 );
 configuredAnonKey = (
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_SUPABASE_ANON_KEY
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || ''
 ).trim();
+
+export function getSupabaseOrigin(): string {
+  return configuredUrl;
+}
 
 export function initSupabaseClient(url?: string, anonKey?: string): SupabaseClient | null {
   const nextUrl = normalizeSupabaseUrl(url) || configuredUrl;
